@@ -1,0 +1,99 @@
+# Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Device tree overlay example:
+# &pinctrl {
+#	pio0_hm01b0_default: pio0_hm01b0_default {
+#		/* gpio 6 is used for vsync */
+#		group1 {
+#			pinmux = <PIO0_P6>;
+#			input-enable;
+#		};
+#		/* gpio 7 is used for hsync */
+#		group2 {
+#			pinmux = <PIO0_P7>;
+#			input-enable;
+#		};
+#		/* gpio 8 is used for pixel clock */
+#		group3 {
+#			pinmux = <PIO0_P8>;
+#			input-enable;
+#		};
+#		/* gpio 9 is used for pixel data */
+#		group4 {
+#			pinmux = <PIO0_P9>;
+#			input-enable;
+#		};
+#	};
+#};
+#
+#
+#&pio0 {
+#	status = "okay";
+#	pio0_hm01b0: pio0_hm01b0{
+#		compatible = "himax,hm01b0";
+#		vsync-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+#		hsync-gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+#		pclk-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+#		data-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+#		pinctrl-0 = <&pio0_hm01b0_default>;
+#		pinctrl-names = "default";
+#		status = "okay";
+#		i2c-bus = <&i2c0>;
+#		i2c-address = <0x24>;
+#		dma = <&dma>;
+#		port {
+#			ep_out1: endpoint {
+#				remote-endpoint-label = "ep_in1";
+#			};
+#		};
+#	};
+#};
+
+description: Himax HM01B0 via PIO
+
+compatible: "himax,hm01b0"
+
+include: ["raspberrypi,pico-pio-device.yaml"]
+
+properties:
+  vsync-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Vertical Sync.
+
+  hsync-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Horizontal Sync.
+
+  pclk-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Clock.
+
+  data-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Data.
+
+  i2c-bus:
+    type: phandle
+    required: true
+
+  i2c-address:
+    type: int
+    required: true
+  
+  dma:
+    type: phandle
+    required: true
+
+
+child-binding:
+  child-binding:
+    include: video-interfaces.yaml
