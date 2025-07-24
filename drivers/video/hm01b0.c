@@ -45,7 +45,7 @@ enum hm01b0_reg {
 
 struct hm01b0_reg_value {
 	enum hm01b0_reg address;
-	size_t value_size; // 1 or 2 bytes
+	size_t value_size; /* 1 or 2 bytes */
 	union {
 		uint16_t word;
 		uint8_t byte;
@@ -64,9 +64,7 @@ const struct hm01b0_reg_value hm01b0_reg_values[RESOLUTION_320x320 + 1][6] = {
 				{REG_BINNING_MODE, sizeof(uint8_t), .value.byte = 0x0},
 				{REG_QVGA_WIN_EN, sizeof(uint8_t), .value.byte = 0x1},
 				{REG_FRAME_LENGTH_LINES, sizeof(uint16_t), .value.word = 0x104},
-				{REG_LINE_LENGTH_PCLK, sizeof(uint16_t), .value.word = 0x178}
-
-	},
+				{REG_LINE_LENGTH_PCLK, sizeof(uint16_t), .value.word = 0x178}},
 	[RESOLUTION_320x320] = {{REG_WIDTH, sizeof(uint8_t), .value.byte = 0x1},
 				{REG_HEIGHT, sizeof(uint8_t), .value.byte = 0x1},
 				{REG_BINNING_MODE, sizeof(uint8_t), .value.byte = 0x0},
@@ -107,9 +105,10 @@ static const struct video_format_cap hm01b0_fmts[] = {
 
 static int hm01b0_write_reg8(const struct device *dev, enum hm01b0_reg reg, uint8_t val)
 {
-	struct hm01b0_config *config = (struct hm01b0_config *)dev->config;
+	const struct hm01b0_config *config = dev->config;
 	uint8_t data[3];
 	uint16_t address = (uint16_t)reg;
+
 	address = sys_cpu_to_be16(address);
 	memcpy(data, &address, sizeof(address));
 	data[2] = val;
@@ -118,24 +117,27 @@ static int hm01b0_write_reg8(const struct device *dev, enum hm01b0_reg reg, uint
 
 static int hm01b0_read_reg8(const struct device *dev, enum hm01b0_reg reg, uint8_t *val)
 {
-	struct hm01b0_config *config = (struct hm01b0_config *)dev->config;
+	const struct hm01b0_config *config = dev->config;
 	uint16_t address = (uint16_t)reg;
+
 	address = sys_cpu_to_be16(reg);
 	return i2c_write_read_dt(&config->i2c_dev, &address, sizeof(address), val, sizeof(*val));
 }
 
 static int hm01b0_write_reg16(const struct device *dev, enum hm01b0_reg reg, uint16_t val)
 {
-	struct hm01b0_config *config = (struct hm01b0_config *)dev->config;
+	const struct hm01b0_config *config = dev->config;
 	uint16_t address = (uint16_t)reg;
 	const uint16_t data[2] = {sys_cpu_to_be16(address), sys_cpu_to_be16(val)};
+
 	return i2c_write_dt(&config->i2c_dev, (const uint8_t *)data, sizeof(data));
 }
 
 static int hm01b0_read_reg16(const struct device *dev, enum hm01b0_reg reg, uint16_t *val)
 {
-	struct hm01b0_config *config = (struct hm01b0_config *)dev->config;
+	const struct hm01b0_config *config = dev->config;
 	uint16_t address = (uint16_t)reg;
+
 	address = sys_cpu_to_be16(reg);
 	int res = i2c_write_read_dt(&config->i2c_dev, &address, sizeof(address), val, sizeof(*val));
 	*val = sys_be16_to_cpu(*val);
@@ -144,10 +146,14 @@ static int hm01b0_read_reg16(const struct device *dev, enum hm01b0_reg reg, uint
 
 static int hm01b0_apply_configuration(const struct device *dev, enum hm01b0_resolution resolution)
 {
-	struct hm01b0_data *data = (struct hm01b0_data *)dev->data;
+	struct hm01b0_data *data = dev->data;
 	int ret;
-	for (int i = 0; i < ARRAY_SIZE(hm01b0_reg_values[resolution]); i++) {
+
+	for (int i = 0;
+	     resolution <= RESOLUTION_320x320 && i < ARRAY_SIZE(hm01b0_reg_values[resolution]);
+	     i++) {
 		const struct hm01b0_reg_value *reg_val = &hm01b0_reg_values[resolution][i];
+
 		if (reg_val->value_size == sizeof(uint8_t)) {
 			ret = hm01b0_write_reg8(dev, reg_val->address, reg_val->value.byte);
 		} else {
@@ -190,10 +196,11 @@ static int hm01b0_get_caps(const struct device *dev, struct video_caps *caps)
 
 static int hm01b0_set_fmt(const struct device *dev, struct video_format *fmt)
 {
-	struct hm01b0_data *drv_data = (struct hm01b0_data *)dev->data;
+	struct hm01b0_data *drv_data = dev->data;
 	uint16_t width, height;
 	int ret = 0;
 	int i = 0;
+
 	LOG_INF("HM01B0 set_fmt: %d x %d, fmt: %s", fmt->width, fmt->height,
 		VIDEO_FOURCC_TO_STR(fmt->pixelformat));
 
@@ -229,6 +236,7 @@ static int hm01b0_set_fmt(const struct device *dev, struct video_format *fmt)
 static int hm01b0_get_fmt(const struct device *dev, struct video_format *fmt)
 {
 	struct hm01b0_data *data = dev->data;
+
 	*fmt = data->fmt;
 	LOG_INF("HM01B0 get_fmt: %d x %d, fmt: %s", fmt->width, fmt->height,
 		VIDEO_FOURCC_TO_STR(fmt->pixelformat));
@@ -250,13 +258,14 @@ static int hm01b0_set_stream(const struct device *dev, bool enable, enum video_b
 	} else {
 		ret = hm01b0_write_reg8(dev, REG_STS, 0x00);
 	}
-	return 0;
+	return ret;
 }
 
 static int hm01b0_soft_reset(const struct device *dev)
 {
 	int ret = hm01b0_write_reg8(dev, REG_RESET, 0x01);
 	uint8_t val = 0xff;
+
 	if (ret == 0) {
 		for (int retries = 0; retries < 10; retries++) {
 			ret = hm01b0_read_reg8(dev, REG_STS, &val);
@@ -288,6 +297,7 @@ static bool hm01b0_check_connection(const struct device *dev)
 	uint16_t model_id;
 	int ret = hm01b0_read_reg16(dev, REG_ID, &model_id);
 	bool is_connected = (ret == 0 && model_id == HM01B0_ID);
+
 	if (!is_connected) {
 		LOG_ERR("Model ID mismatch: expected 0x%04x, got 0x%04x, ret (%d)", HM01B0_ID,
 			model_id, ret);
@@ -297,8 +307,8 @@ static bool hm01b0_check_connection(const struct device *dev)
 
 static int hm01b0_init(const struct device *dev)
 {
-	struct hm01b0_data *data = (struct hm01b0_data *)dev->data;
-	struct hm01b0_config *config = (struct hm01b0_config *)dev->config;
+	struct hm01b0_data *data = dev->data;
+	const struct hm01b0_config *config = dev->config;
 
 	if (config->data_bits == 8) {
 		data->ctrl_val = 0x02;
@@ -336,11 +346,11 @@ static int hm01b0_init(const struct device *dev)
 }
 
 #define HM01B0_INIT(inst)                                                                          \
-	static struct hm01b0_config hm01b0_config_##inst = {                                       \
+	const struct hm01b0_config hm01b0_config_##inst = {                                        \
 		.i2c_dev = I2C_DT_SPEC_INST_GET(inst),                                             \
 		.data_bits = 1 /* Use only 1 pin for data */                                       \
 	};                                                                                         \
-	static struct hm01b0_data hm01b0_data_##inst;                                              \
+	struct hm01b0_data hm01b0_data_##inst;                                                     \
 	DEVICE_DT_INST_DEFINE(inst, &hm01b0_init, NULL, &hm01b0_data_##inst,                       \
 			      &hm01b0_config_##inst, POST_KERNEL, CONFIG_VIDEO_INIT_PRIORITY,      \
 			      &hm01b0_driver_api);                                                 \
